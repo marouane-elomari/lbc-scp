@@ -1,18 +1,25 @@
 export async function GET(request) {
-  const DATADOME_COOKIE = "sKpIG5jJf3Qr7ClEvGOI6H1_vWI2BSSrqR0tpkXAw2aziBo3swW7n0p9dwxeot2CjLRjvOH~fIUP5YB3E4Ew_8UJERBwKeFjYHwvJXC8rZpQIlK9EBISP8wjz52SGl5_";
-
+  // Définition des paramètres de la requête
   const targetUrl = "https://www.leboncoin.fr/_next/data/XiXNA9MgsN72zG6vUqUU2/ad/ventes_immobilieres/3217421417.json?cat=ventes_immobilieres&id=3217421417";
   const startTime = Date.now();
+
+  // Dictionnaire des en-têtes et cookies
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Referer': 'https://www.leboncoin.fr/',
+    'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+    // Injection des cookies sous forme de chaîne formatée
+    'Cookie': [
+      'datadome=AYYWdrRbl2K~mSOdx33F_Xj474VqVVhDvukPZb1PEXRw1VSOx6U~jnJ_cX5CWrfY1McnkaATc~sWbKXYagoJr4s03lhCeC_2i_1wZTknrnUqprlM7YAETkNU37vc1Lro',
+      'didomi_token=123456' // Exemple d'autres cookies si nécessaire
+    ].join('; ')
+  };
 
   try {
     const response = await fetch(targetUrl, {
       method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Referer': 'https://www.leboncoin.fr/',
-        'Cookie': `datadome=${DATADOME_COOKIE}`,
-      },
+      headers: headers,
     });
 
     const durationMs = Date.now() - startTime;
@@ -22,10 +29,10 @@ export async function GET(request) {
       return new Response(
         JSON.stringify({
           status: "SUCCESS",
-          message: "Le test avec le cookie DataDome a fonctionné !",
+          message: "Données récupérées avec succès.",
           httpStatus: response.status,
           responseTime: `${durationMs}ms`,
-          preview: textBody.substring(0, 300)
+          dataPreview: textBody.substring(0, 300)
         }, null, 2),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
@@ -33,10 +40,11 @@ export async function GET(request) {
       return new Response(
         JSON.stringify({
           status: "BLOCKED_OR_FAILED",
-          message: `Échec malgré le cookie (HTTP ${response.status}).`,
+          message: `Réponse du serveur hôte : HTTP ${response.status}`,
           httpStatus: response.status,
           responseTime: `${durationMs}ms`,
-          preview: textBody.substring(0, 300)
+          isDataDomePresent: response.headers.has('x-datadome') || textBody.includes('datadome'),
+          bodyPreview: textBody.substring(0, 300)
         }, null, 2),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
