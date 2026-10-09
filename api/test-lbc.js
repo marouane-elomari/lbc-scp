@@ -1,4 +1,4 @@
-export default async function handler(request) {
+export async function GET(request) {
   const targetUrl = "https://www.leboncoin.fr/_next/data/XiXNA9MgsN72zG6vUqUU2/ad/ventes_immobilieres/3217421417.json?cat=ventes_immobilieres&id=3217421417";
   const startTime = Date.now();
 
