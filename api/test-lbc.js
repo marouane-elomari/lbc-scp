@@ -5,17 +5,19 @@ export async function GET(request) {
   const targetUrl = "https://api.leboncoin.fr/finder/search";
   const startTime = Date.now();
 
-  // 1. Récupération de l'IP publique Vercel
-  let vercelPublicIp = "Unknown";
+  // 1. Détection de la signature TLS (JA3) de Vercel
+  let tlsAnalysis = null;
   try {
-    const ipCheck = await fetch("https://api.ipify.org?format=json");
-    const ipData = await ipCheck.json();
-    vercelPublicIp = ipData.ip;
+    const tlsCheck = await fetch("https://tls.browserleaks.com/json");
+    tlsAnalysis = await tlsCheck.json();
   } catch (e) {
-    vercelPublicIp = "Failed to retrieve IP";
+    tlsAnalysis = { error: "Impossible de récupérer l'empreinte TLS" };
   }
 
-  // 2. Payload de recherche
+  // 2. Détection de l'IP publique Vercel
+  let vercelPublicIp = tlsAnalysis?.ip || "Unknown";
+
+  // 3. Payload de recherche
   const searchPayload = {
     limit: 10,
     filters: {
@@ -23,7 +25,7 @@ export async function GET(request) {
     }
   };
 
-  // 3. En-têtes HTTP sortants
+  // 4. En-têtes HTTP sortants
   const requestHeaders = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
@@ -38,7 +40,7 @@ export async function GET(request) {
   }
 
   try {
-    // 4. Appel de l'API
+    // 5. Exécution de la requête vers LeBonCoin
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: requestHeaders,
@@ -48,7 +50,6 @@ export async function GET(request) {
     const durationMs = Date.now() - startTime;
     const rawResponseBody = await response.text();
 
-    // 5. Extraction de tous les en-têtes HTTP entrants
     const responseHeaders = {};
     response.headers.forEach((value, key) => {
       responseHeaders[key] = value;
@@ -61,20 +62,26 @@ export async function GET(request) {
       parsedResponseBody = rawResponseBody;
     }
 
-    // 6. Rapport de diagnostic
+    // 6. Rapport complet incluant l'empreinte TLS/JA3
     const detailedReport = {
+      tls_fingerprint_captured: {
+        ja3_hash: tlsAnalysis?.ja3_hash || "N/A",
+        tls_version: tlsAnalysis?.tls_version || "N/A",
+        ciphers_list: tlsAnalysis?.ciphers || "N/A",
+        extensions_list: tlsAnalysis?.extensions || "N/A",
+        curves_list: tlsAnalysis?.curves || "N/A",
+        note: "C'est ce hash JA3 précis que DataDome voit arriver sur ses serveurs."
+      },
       architecture_context: {
         runtime: `Node.js ${process.version}`,
         vercel_region: process.env.VERCEL_REGION || "Local / Unknown",
-        outbound_public_ip: vercelPublicIp,
-        ip_type_note: "Adresse IP appartenant aux plages AWS/Vercel (classée Datacenter par DataDome)."
+        outbound_public_ip: vercelPublicIp
       },
       outgoing_request: {
         method: "POST",
         target_url: targetUrl,
         headers_sent: requestHeaders,
-        body_sent: searchPayload,
-        tls_fingerprint_note: "La poignée de main TLS (JA3/JA4) est exécutée au niveau 4 par la pile OpenSSL de Node.js."
+        body_sent: searchPayload
       },
       incoming_response: {
         status_code: response.status,
