@@ -8,7 +8,7 @@ export async function GET(request) {
   const searchPayload = {
     limit: 10,
     filters: {
-      category: { id: "10" } // 10 = Locations
+      category: { id: "10" }
     }
   };
 
@@ -33,71 +33,47 @@ export async function GET(request) {
     });
 
     const durationMs = Date.now() - startTime;
-    const textBody = await response.text();
+    const rawTextBody = await response.text();
 
-    // Extraction des en-têtes de diagnostic DataDome
-    const ddbHeader = response.headers.get('x-dd-b');
-    const datadomeHeader = response.headers.get('x-datadome');
-    const setCookieHeader = response.headers.get('set-cookie');
+    // Conversion de tous les en-têtes de réponse en un objet JS simple
+    const responseHeaders = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
 
-    // Interprétation du code x-dd-b
-    let ddbExplanation = "Non présent / Non défini";
-    if (ddbHeader === '1') {
-      ddbExplanation = "1 (Block) - Anomalie détectée dans les en-têtes ou la session.";
-    } else if (ddbHeader === '2') {
-      ddbExplanation = "2 (Hard Block) - IP bloquée (réputation IP Datacenter/Vercel).";
-    } else if (ddbHeader === '3') {
-      ddbExplanation = "3 (Device Check) - Détection liée à l'empreinte navigateur/matérielle.";
-    } else if (ddbHeader === '259') {
-      ddbExplanation = "259 (Device Check Invisible) - Contrôle d'empreinte en arrière-plan.";
+    // Essai de parsing JSON du body si possible, sinon retour du texte brut
+    let parsedBody;
+    try {
+      parsedBody = JSON.parse(rawTextBody);
+    } catch (e) {
+      parsedBody = rawTextBody;
     }
 
-    if (response.ok) {
-      let data = {};
-      try {
-        data = JSON.parse(textBody);
-      } catch (e) {
-        data = { raw: textBody.substring(0, 200) };
+    // Retour de la réponse HTTP brute complète
+    return new Response(
+      JSON.stringify(
+        {
+          meta: {
+            httpStatus: response.status,
+            statusText: response.statusText,
+            responseTime: `${durationMs}ms`
+          },
+          rawHeaders: responseHeaders,
+          rawBody: parsedBody
+        },
+        null,
+        2
+      ),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' }
       }
-
-      return new Response(
-        JSON.stringify({
-          status: "SUCCESS",
-          httpStatus: response.status,
-          responseTime: `${durationMs}ms`,
-          dataDomeDiagnostic: {
-            'x-dd-b': ddbHeader,
-            'x-dd-b-explanation': ddbExplanation,
-            'x-datadome': datadomeHeader,
-            'hasSetCookie': !!setCookieHeader
-          },
-          totalAds: data.total || 0,
-          adsPreview: data.ads ? data.ads.slice(0, 2) : []
-        }, null, 2),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
-    } else {
-      return new Response(
-        JSON.stringify({
-          status: "BLOCKED_OR_FAILED",
-          httpStatus: response.status,
-          responseTime: `${durationMs}ms`,
-          dataDomeDiagnostic: {
-            'x-dd-b': ddbHeader,
-            'x-dd-b-explanation': ddbExplanation,
-            'x-datadome': datadomeHeader,
-            'setCookieHeader': setCookieHeader || null
-          },
-          bodyPreview: textBody.substring(0, 300)
-        }, null, 2),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    );
 
   } catch (error) {
     return new Response(
       JSON.stringify({
-        status: "ERROR",
+        status: "FETCH_ERROR",
         message: error.message
       }, null, 2),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
