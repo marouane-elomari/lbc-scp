@@ -1,3 +1,4 @@
+//fuck datadom GRRRRRRR
 export async function GET(request) {
   const targetUrl = "https://api.leboncoin.fr/finder/search";
   const startTime = Date.now();
